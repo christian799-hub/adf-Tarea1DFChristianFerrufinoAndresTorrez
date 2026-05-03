@@ -42,6 +42,9 @@
 				},
 				{
 					"name": "filter1"
+				},
+				{
+					"name": "select1"
 				}
 			],
 			"scriptLines": [
@@ -81,7 +84,24 @@
 				"          qty = toInteger(qty)) ~> derivedColumn4",
 				"derivedColumn4 derive(timestamp = coalesce(toDate(timestamp, 'yyyy-MM-dd'),toDate(timestamp, 'dd-MM-yyyy'),toDate(timestamp, 'MM-dd-yyyy'),toDate(timestamp, 'yyyy/MM/dd'),toDate(timestamp, 'dd/MM/yyyy'),toDate(timestamp, 'MM/dd/yyyy'),toDate(timestamp, 'dd/MMM/yyyy'),toDate(timestamp, 'dd-MMM-yyyy'))) ~> derivedColumn5",
 				"derivedColumn5 filter(qty > 0 && !isNull(unit_price) && !isNull(timestamp)) ~> filter1",
-				"filter1 sink(allowSchemaDrift: true,",
+				"filter1 select(mapColumn(",
+				"          id_venta = order_id,",
+				"          fecha = timestamp,",
+				"          producto = product,",
+				"          cantidad = qty,",
+				"          precio_unitario = unit_price,",
+				"          cliente_nombre = {customer/name},",
+				"          cliente_email = {customer/email},",
+				"          sucursal = {customer/city},",
+				"          metodo_pago = payment_method,",
+				"          status,",
+				"          costo_envio = shipping_cost,",
+				"          canal = channel,",
+				"          vendedor = customer",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     input(",
 				"          id_venta as string,",
