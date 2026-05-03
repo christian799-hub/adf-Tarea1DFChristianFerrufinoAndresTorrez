@@ -1,0 +1,108 @@
+{
+	"name": "df_ventas_lpz_bronze_silver",
+	"properties": {
+		"folder": {
+			"name": "bronze"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "Ventas_lpz",
+						"type": "DatasetReference"
+					},
+					"name": "source1"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "Ventas_scz_limpio",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "select1"
+				},
+				{
+					"name": "EliminarEspacio"
+				},
+				{
+					"name": "NormalizarSucursal"
+				},
+				{
+					"name": "NormalizarFecha"
+				},
+				{
+					"name": "NormalizarPrecio"
+				},
+				{
+					"name": "EliminarNulos"
+				},
+				{
+					"name": "CantidadInteger"
+				},
+				{
+					"name": "CapitalizarLetras"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          ID_Venta as string,",
+				"          Fecha_Venta as string,",
+				"          Producto as string,",
+				"          Cant as string,",
+				"          PrecioUnit as string,",
+				"          Sucursal as string,",
+				"          Vendedor as string,",
+				"          NombreCliente as string,",
+				"          EmailCliente as string,",
+				"          MetodoPago as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> source1",
+				"source1 select(mapColumn(",
+				"          id_venta = ID_Venta,",
+				"          fecha = Fecha_Venta,",
+				"          producto = Producto,",
+				"          cantidad = Cant,",
+				"          precio_unitario = PrecioUnit,",
+				"          sucursal = Sucursal,",
+				"          vendedor = Vendedor,",
+				"          cliente_nombre = NombreCliente,",
+				"          cliente_email = EmailCliente,",
+				"          metodo_pago = MetodoPago",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> select1",
+				"select1 derive(vendedor = trim(vendedor),",
+				"          cliente_nombre = trim(cliente_nombre),",
+				"          producto = trim(producto),",
+				"          sucursal = trim(sucursal),",
+				"          cliente_email = trim(cliente_email)) ~> EliminarEspacio",
+				"EliminarEspacio derive(sucursal = iif(in(['LPZ',' La Paz', 'LP', 'la paz', 'LA PAZ', 'LaPaz', 'L.P', 'L P.'], sucursal), 'La Paz', sucursal),",
+				"          canal = 'Sucursal') ~> NormalizarSucursal",
+				"NormalizarSucursal derive(fecha = coalesce(toDate(fecha, 'yyyy-MM-dd'),toDate(fecha, 'dd-MM-yyyy'),toDate(fecha, 'MM-dd-yyyy'),toDate(fecha, 'yyyy/MM/dd'),toDate(fecha, 'dd/MM/yyyy'),toDate(fecha, 'MM/dd/yyyy'),toDate(fecha, 'dd/MMM/yyyy'),toDate(fecha, 'dd-MMM-yyyy'),toDate(fecha, 'MMM/dd/yyyy'))) ~> NormalizarFecha",
+				"NormalizarFecha derive(precio_unitario = toFloat(regexReplace(toString(precio_unitario),'[^0-9.]', ''))) ~> NormalizarPrecio",
+				"CapitalizarLetras filter(cantidad > 0 && !isNull(precio_unitario) && !isNull(fecha)) ~> EliminarNulos",
+				"NormalizarPrecio derive(cantidad = toInteger(cantidad),",
+				"          precio_unitario = toFloat(regexReplace(toString(precio_unitario),'[^0-9.]', ''))) ~> CantidadInteger",
+				"CantidadInteger derive(producto = initCap(regexReplace(producto,'\\\\s+',' '))) ~> CapitalizarLetras",
+				"EliminarNulos sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     partitionFileNames:['Ventas_lpz_limpio.csv'],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('hash', 1)) ~> sink1"
+			]
+		}
+	}
+}
